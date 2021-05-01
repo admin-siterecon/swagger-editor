@@ -24,7 +24,7 @@ export default class Topbar extends React.Component {
       definitionVersion: "Unknown"
     }
 
-    this.GITHUB_AUTH_TOKEN = "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";
+    this.BASE_GITHUB_URL = "http://localhost:8090"
   }
 
   getGeneratorUrl = () => {
@@ -97,7 +97,7 @@ export default class Topbar extends React.Component {
   instantiateListOfBranches = async () => {
     const { Octokit } = require("@octokit/rest");
     const octokit = new Octokit({
-      auth: this.GITHUB_AUTH_TOKEN,
+      baseUrl: this.BASE_GITHUB_URL
     })
 
 
@@ -113,7 +113,7 @@ export default class Topbar extends React.Component {
   importFromBranch = async (branch) => {
     const { Octokit } = require("@octokit/rest");
     const octokit = new Octokit({
-      auth: this.GITHUB_AUTH_TOKEN,
+      baseUrl: this.BASE_GITHUB_URL,
     })
 
     const { data: content_details } = await octokit.request('GET /repos/{owner}/{repo}/contents/{path}', {
@@ -221,7 +221,7 @@ export default class Topbar extends React.Component {
     let editorContent = this.props.specSelectors.specStr()
     const { Octokit } = require("@octokit/rest");
     const octokit = new Octokit({
-      auth: this.GITHUB_AUTH_TOKEN,
+      baseUrl: this.BASE_GITHUB_URL,
     });
     let buffer = require('buffer/').Buffer;
     let editorContentEncoded = buffer.from(editorContent).toString('base64');
