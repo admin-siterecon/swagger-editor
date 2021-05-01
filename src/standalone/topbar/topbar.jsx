@@ -24,7 +24,7 @@ export default class Topbar extends React.Component {
       definitionVersion: "Unknown"
     }
 
-    this.GITHUB_AUTH_TOKEN = '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';
+    this.GITHUB_AUTH_TOKEN = "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";
   }
 
   getGeneratorUrl = () => {
