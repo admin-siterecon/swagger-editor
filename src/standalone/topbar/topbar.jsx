@@ -17,8 +17,14 @@ export default class Topbar extends React.Component {
       swaggerClient: null,
       clients: [],
       servers: [],
+      branches: [],
+      selectedBranch: "",
+      selectedFileSHA: "",
+      isAFileSelected: false,
       definitionVersion: "Unknown"
     }
+
+    this.GITHUB_AUTH_TOKEN = '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';
   }
 
   getGeneratorUrl = () => {
@@ -66,7 +72,7 @@ export default class Topbar extends React.Component {
       .then(res => {
         this.setState({ clients: res.body || [] })
       })
-      
+
       serverGetter({}, {
         // contextUrl is needed because swagger-client is curently
         // not building relative server URLs correctly
@@ -88,6 +94,55 @@ export default class Topbar extends React.Component {
   }
 
   // Menu actions
+  instantiateListOfBranches = async () => {
+    const { Octokit } = require("@octokit/rest");
+    const octokit = new Octokit({
+      auth: this.GITHUB_AUTH_TOKEN,
+    })
+
+
+    const { data: branch_details } = await octokit.repos.listBranches({
+      owner: "SiteRecon",
+      repo: "siterecon-swagger",
+    });
+
+    // console.log(branch_details);
+    this.state.branches = branch_details.map(branch => branch.name);
+  }
+
+  importFromBranch = async (branch) => {
+    const { Octokit } = require("@octokit/rest");
+    const octokit = new Octokit({
+      auth: this.GITHUB_AUTH_TOKEN,
+    })
+
+    const { data: content_details } = await octokit.request('GET /repos/{owner}/{repo}/contents/{path}', {
+      owner: 'SiteRecon',
+      repo: 'siterecon-swagger',
+      path: 'siterecon-backend.yaml',
+      ref: branch,
+    });
+
+    if (content_details.sha) {
+      this.state.selectedFileSHA = content_details.sha;
+      this.state.selectedBranch = branch;
+      this.state.isAFileSelected = true;
+    }
+
+    if (content_details.download_url) {
+      fetch(content_details.download_url)
+        .then(res => res.text())
+        .then(text => {
+          this.props.specActions.updateSpec(
+            YAML.safeDump(YAML.safeLoad(text), {
+              lineWidth: -1,
+            }),
+          )
+        })
+    } else {
+      return alert("This branch does not have siterecon-backend.yaml file.");
+    }
+  }
 
   importFromURL = () => {
     let url = prompt("Enter the URL to import from:")
@@ -159,6 +214,27 @@ export default class Topbar extends React.Component {
     let isOAS3 = this.props.specSelectors.isOAS3()
     let fileName = isOAS3 ? "openapi.txt" : "swagger.txt"
     this.downloadFile(editorContent, fileName)
+  }
+
+  commitToBranch = async (branch, sha) => {
+    // Download raw text content
+    let editorContent = this.props.specSelectors.specStr()
+    const { Octokit } = require("@octokit/rest");
+    const octokit = new Octokit({
+      auth: this.GITHUB_AUTH_TOKEN,
+    });
+    let buffer = require('buffer/').Buffer;
+    let editorContentEncoded = buffer.from(editorContent).toString('base64');
+    const { data: content_details } = await octokit.request('PUT /repos/{owner}/{repo}/contents/{path}', {
+      owner: 'SiteRecon',
+      repo: 'siterecon-swagger',
+      path: 'siterecon-backend.yaml',
+      message: 'admin-bot commit',
+      content: editorContentEncoded,
+      branch: branch,
+      sha: sha,
+    });
+
   }
 
   convertToYaml = () => {
@@ -290,7 +366,8 @@ export default class Topbar extends React.Component {
   ///// Lifecycle
 
   componentDidMount() {
-    this.instantiateGeneratorClient()
+    this.instantiateGeneratorClient();
+    this.instantiateListOfBranches();
   }
 
   componentDidUpdate() {
@@ -304,7 +381,10 @@ export default class Topbar extends React.Component {
       // eslint-disable-next-line react/no-did-update-set-state
       this.setState({
         definitionVersion: version
-      }, () => this.instantiateGeneratorClient())
+      }, () => {
+        this.instantiateGeneratorClient();
+        this.instantiateListOfBranches();
+      })
 
     }
   }
@@ -361,12 +441,21 @@ export default class Topbar extends React.Component {
             </DropdownMenu>
             <DropdownMenu {...makeMenuOptions("Edit")}>
               <li><button type="button" onClick={this.convertToYaml}>Convert to YAML</button></li>
-              <ConvertDefinitionMenuItem 
+              <ConvertDefinitionMenuItem
                 isSwagger2={specSelectors.isSwagger2()}
                 onClick={() => topbarActions.showModal("convert")}
                 />
             </DropdownMenu>
             <TopbarInsert {...this.props} />
+            <DropdownMenu className="long" {...makeMenuOptions("Github")}>
+              { this.state.branches
+                .map((br, i) => <li key={i}><button type="button" onClick={this.importFromBranch.bind(null, br)}>{br}</button></li>) }
+            </DropdownMenu>
+            { this.state.isAFileSelected ?
+              <button type="button" className="commit"> { this.state.selectedBranch } </button>
+              : null }
+            <button type="button" className="commit" onClick={this.commitToBranch.bind(null, this.state.selectedBranch, this.state.selectedFileSHA)}>Commit</button>
+            <button type="button" className="commit" onClick={this.importFromBranch.bind(null, this.state.selectedBranch)}>Refresh</button>
             { showServersMenu ? <DropdownMenu className="long" {...makeMenuOptions("Generate Server")}>
               { this.state.servers
                   .map((serv, i) => <li key={i}><button type="button" onClick={this.downloadGeneratedFile.bind(null, "server", serv)}>{serv}</button></li>) }

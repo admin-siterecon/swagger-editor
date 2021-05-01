@@ -1,34 +1,55 @@
-import PetstoreYaml from "./petstore"
-const CONTENT_KEY = "swagger-editor-content"
+const https = require("https")
 
-let localStorage = window.localStorage
+let response_body = ""
 
-export const updateSpec = (ori) => (...args) => {
-  let [spec] = args
-  ori(...args)
-  saveContentToStorage(spec)
+function getPromise() {
+  return new Promise((resolve, reject) => {
+    let chunks_of_data = []
+
+    https.get("https://petstore.swagger.io/v2/swagger.yaml", (response) => {
+
+      response.on("data", (fragments) => {
+        chunks_of_data.push(fragments)
+      })
+
+      response.on("end", () => {
+        let response = chunks_of_data.join("\r\n")
+        resolve(response.toString())
+      })
+
+      response.on("error", (error) => {
+        reject(error)
+      })
+    })
+  })
 }
 
-export default function(system) {
+async function makeSynchronousRequest(request) {
+  try {
+    let http_promise = getPromise()
+    response_body = await http_promise
+    // holds response from server that is passed when Promise is resolved
+  } catch(error) {
+    // Promise rejected
+    console.log(error)
+  }
+}
+
+export const updateSpec = (ori) => (...args) => {
+  ori(...args)
+}
+
+export default function (system) {
   // setTimeout runs on the next tick
-  setTimeout(() => {
-    if(localStorage.getItem(CONTENT_KEY)) {
-      system.specActions.updateSpec(localStorage.getItem(CONTENT_KEY), "local-storage")
-    } else if(localStorage.getItem("ngStorage-SwaggerEditorCache")) {
-      // Legacy migration for swagger-editor 2.x
-      try {
-        let obj = JSON.parse(localStorage.getItem("ngStorage-SwaggerEditorCache"))
-        let yaml = obj.yaml
-        system.specActions.updateSpec(yaml)
-        saveContentToStorage(yaml)
-        localStorage.setItem("ngStorage-SwaggerEditorCache", null)
-      } catch(e) {
-        system.specActions.updateSpec(PetstoreYaml)
-      }
-    } else {
-      system.specActions.updateSpec(PetstoreYaml)
-    }
-  }, 0)
+  // anonymous async function to execute some code synchronously after http request
+  (async function() {
+    // wait to http request to finish
+    await makeSynchronousRequest()
+    // below code will be executed after http request is finished
+
+    system.specActions.updateSpec(response_body)
+  })()
+
   return {
     statePlugins: {
       spec: {
@@ -38,8 +59,4 @@ export default function(system) {
       }
     }
   }
-}
-
-function saveContentToStorage(str) {
-  return localStorage.setItem(CONTENT_KEY, str)
 }

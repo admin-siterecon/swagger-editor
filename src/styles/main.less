@@ -3,7 +3,7 @@
   // Partials
   @import './_editor.less';
   @import './_read-only-watermark.less';
-  
+
   @import (less) "../../node_modules/swagger-ui/dist/swagger-ui.css";
 }
 
@@ -16,4 +16,18 @@
 // ace editor override
 div.ace_editor.ace_autocomplete {
   width: 50%;
+}
+
+// Navbar/Topbar buttons
+.commit {
+  background-color: #bdc3c7; /* Green */
+  border: none;
+  color: black !important;
+  padding: 10px 32px;
+  text-align: center;
+  text-decoration: none;
+  display: inline-block;
+  font-size: 14px !important;
+  font-weight: 500 !important;
+  cursor: pointer;
 }
